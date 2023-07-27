@@ -97,8 +97,8 @@ fn main () {
     // Copy the files.
     for file in &files {
 
-        let parent_dir = file.parent().unwrap().strip_prefix(&opt.input).unwrap();
-        let destination_file = opt.destination.join(parent_dir).join(file.file_name().unwrap());
+        // Destination file
+        let destination_file = opt.destination.join(file.strip_prefix(&opt.input.parent().unwrap()).unwrap());
 
         // Check if the file already exists in the destination directory. Verify that the file sizes match.
         if destination_file.exists() && destination_file.metadata().unwrap().len() == file.metadata().unwrap().len() {
