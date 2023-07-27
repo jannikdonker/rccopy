@@ -200,10 +200,12 @@ fn get_files_in_directory(dir: &PathBuf) -> Vec<PathBuf> {
         if path.is_dir() {
             files.append(&mut get_files_in_directory(&path));
         } else {
-            files.push(path);
+            let file_name = path.file_name().unwrap().to_str().unwrap();
+            if ![".DS_Store", ".AppleDouble", ".LSOverride", "._*", ".DocumentRevisions-V100", ".fseventsd", ".Spotlight-V100", ".TemporaryItems", ".Trashes", ".VolumeIcon.icns", ".com.apple.timemachine.donotpresent"].contains(&file_name) {
+                files.push(path);
+            }
         }
     }
-
     files
 }
 
