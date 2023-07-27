@@ -160,7 +160,7 @@ fn main () {
         println!("Writing mhl file...");
 
         // MHL file name is the basedir of the source directory + the current date and time + .mhl
-        let mhl_file = opt.destination.join(format!("{}-{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date_for_file_name));
+        let mhl_file = opt.destination.join(format!("{}_{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date_for_file_name));
 
         let mhl_result = write_mhl(&mhl_file, mhl_data, start_date);
 
