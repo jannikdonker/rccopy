@@ -154,7 +154,7 @@ fn main () {
         }
     }
 
-    if opt.mhl {
+    if opt.mhl && copied_anything && !opt.dry_run {
         println!("-------------------------");
         println!("Writing mhl file...");
 
