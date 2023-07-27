@@ -192,6 +192,18 @@ fn main () {
 // Searches the given directory recursively for files and returns a vector of the files.
 fn get_files_in_directory(dir: &PathBuf) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
+    let exclude_files = [
+        ".DS_Store",
+        ".AppleDouble",
+        ".LSOverride",
+        ".DocumentRevisions-V100",
+        ".fseventsd",
+        ".Spotlight-V100",
+        ".TemporaryItems",
+        ".Trashes",
+        ".VolumeIcon.icns",
+        ".com.apple.timemachine.donotpresent"
+    ];
 
     for entry in fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
@@ -199,13 +211,15 @@ fn get_files_in_directory(dir: &PathBuf) -> Vec<PathBuf> {
 
         if path.is_dir() {
             files.append(&mut get_files_in_directory(&path));
-        } else {
-            let file_name = path.file_name().unwrap().to_str().unwrap();
-            if ![".DS_Store", ".AppleDouble", ".LSOverride", "._*", ".DocumentRevisions-V100", ".fseventsd", ".Spotlight-V100", ".TemporaryItems", ".Trashes", ".VolumeIcon.icns", ".com.apple.timemachine.donotpresent"].contains(&file_name) {
-                files.push(path);
+        } else if let Some(file_name) = path.file_name() {
+            if let Some(file_name_str) = file_name.to_str() {
+                if !exclude_files.contains(&file_name_str) && !file_name_str.starts_with("._") {
+                    files.push(path);
+                }
             }
         }
     }
+
     files
 }
 
