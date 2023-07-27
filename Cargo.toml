@@ -1,0 +1,25 @@
+[package]
+name = "rccopy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jannik Donker"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = { git = "https://github.com/chronotope/chrono.git" }
+md-5 = "0.10.5"
+sha1 = "0.10.5"
+users = "0.11.0"
+clap = { version = "4.3.19", features = ["derive"] }
+filetime_creation = "0.1"
+quick-xml = "0.23.0"
+hostname = "0.3.1"
+whoami = "1.4.1"
+
+[dependencies.xxhash-rust]
+version = "0.8.5"
+features = ["xxh64"]
+
+[profile.release]
+lto = true
