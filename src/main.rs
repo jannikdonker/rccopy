@@ -53,6 +53,7 @@ const CHUNK_SIZE: usize = 1024 * 1024 * 8;
 
 fn main () {
     let start_date = format_system_time_to_rfc3339(SystemTime::now());
+    let start_date_for_file_name: String = start_date.replace(":", "").replace("T", "_").replace("Z", "");
     println!("Start date: {}", start_date);
 
     let opt: Opt = Opt::parse();
@@ -159,7 +160,7 @@ fn main () {
         println!("Writing mhl file...");
 
         // MHL file name is the basedir of the source directory + the current date and time + .mhl
-        let mhl_file = opt.destination.join(format!("{}-{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date.replace(":", "-")));
+        let mhl_file = opt.destination.join(format!("{}-{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date_for_file_name));
 
         let mhl_result = write_mhl(&mhl_file, mhl_data, start_date);
 
