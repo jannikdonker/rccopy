@@ -145,7 +145,7 @@ fn main () {
                     opt.checksum.as_ref().unwrap().to_string()
                 };
                 mhl_data.push(FileMetadata {
-                    file: destination_file.strip_prefix(&opt.destination).unwrap().to_str().unwrap().to_string(),
+                    file: destination_file.strip_prefix(&opt.destination).unwrap().strip_prefix(opt.input.file_name().unwrap().to_str().unwrap().to_string()).unwrap().to_str().unwrap().to_string(),
                     size: file.metadata().unwrap().len(),
                     last_modification_date: file.metadata().unwrap().modified().unwrap(),
                     checksum: src_checksum.unwrap(),
@@ -166,7 +166,6 @@ fn main () {
         println!("-------------------------");
         println!("Writing mhl file...");
 
-        // MHL file name is constructed like this: <destination>/<input_base_dir>/<input_file_name>_<start_date>.mhl
         let mhl_file = opt.destination.join(opt.input.file_name().unwrap().to_str().unwrap().to_string()).join(format!("{}_{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date_for_file_name));
 
         let mhl_result = write_mhl(&mhl_file, mhl_data, start_date);
