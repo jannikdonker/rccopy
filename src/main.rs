@@ -139,12 +139,17 @@ fn main () {
                 continue;
             } else if src_checksum.as_ref().unwrap() == dest_checksum.as_ref().unwrap() {
                 println!("Checksums match: {}", src_checksum.as_ref().unwrap());
+                let checksum_method = if opt.checksum.as_ref().unwrap() == "xxhash64" {
+                    "xxhash64be".to_string()
+                } else {
+                    opt.checksum.as_ref().unwrap().to_string()
+                };
                 mhl_data.push(FileMetadata {
                     file: destination_file.strip_prefix(&opt.destination).unwrap().to_str().unwrap().to_string(),
                     size: file.metadata().unwrap().len(),
                     last_modification_date: file.metadata().unwrap().modified().unwrap(),
                     checksum: src_checksum.unwrap(),
-                    checksum_method: opt.checksum.as_ref().unwrap().to_string(),
+                    checksum_method,
                     hash_date: SystemTime::now(),
                 });
                 continue;
