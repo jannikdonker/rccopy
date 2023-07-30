@@ -88,7 +88,7 @@ fn main () {
     let files: Vec<PathBuf> = get_files_in_directory(&opt.input);
 
     // Search the destination directory recursively for empty directories.
-    let empty_dirs: Vec<PathBuf> = get_empty_dirs(&opt.destination);
+    let empty_dirs: Vec<PathBuf> = get_empty_dirs(&opt.input);
 
     // Initialze some stuff
     let mut failed_files: Vec<PathBuf> = Vec::new();
@@ -131,7 +131,7 @@ fn main () {
         } else {
             copied_anything = true;
 
-            println!("Verifying checksum... ({})", opt.checksum.as_ref().unwrap());
+            print!("Verifying checksum... ({})\r", opt.checksum.as_ref().unwrap());
 
             let dest_checksum = process_checksum(&destination_file.to_str().unwrap(), &opt.checksum);
 
@@ -141,7 +141,7 @@ fn main () {
                 had_errors = true;
                 continue;
             } else if src_checksum.as_ref().unwrap() == dest_checksum.as_ref().unwrap() {
-                println!("Checksums match: {}", src_checksum.as_ref().unwrap());
+                println!("Checksums match: {} ({})", src_checksum.as_ref().unwrap(), opt.checksum.as_ref().unwrap());
                 let checksum_method = if opt.checksum.as_ref().unwrap() == "xxhash64" {
                     "xxhash64be".to_string()
                 } else {
@@ -250,10 +250,16 @@ fn get_empty_dirs (dir: &PathBuf) -> Vec<PathBuf> {
         let path = entry.path();
 
         if path.is_dir() {
-            let sub_dirs = get_empty_dirs(&path);
-            if sub_dirs.len() == 0 {
-                empty_dirs.push(path);
+            let mut is_empty = true;
+            for _ in fs::read_dir(&path).unwrap() {
+                is_empty = false;
+                break;
             }
+            if is_empty {
+                empty_dirs.push(path.clone());
+            }
+            let sub_dirs = get_empty_dirs(&path);
+            empty_dirs.extend(sub_dirs);
         }
     }
 
