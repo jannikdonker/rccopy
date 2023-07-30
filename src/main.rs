@@ -87,6 +87,9 @@ fn main () {
     // Search the input directory recursively for files.
     let files: Vec<PathBuf> = get_files_in_directory(&opt.input);
 
+    // Search the destination directory recursively for empty directories.
+    let empty_dirs: Vec<PathBuf> = get_empty_dirs(&opt.destination);
+
     // Initialze some stuff
     let mut failed_files: Vec<PathBuf> = Vec::new();
     let mut had_errors = false;
@@ -162,6 +165,16 @@ fn main () {
         }
     }
 
+    // Create the empty directories in the destination directory.
+    for dir in empty_dirs {
+        let destination_dir = opt.destination.join(dir.strip_prefix(&opt.input.parent().unwrap()).unwrap());
+        if !destination_dir.exists() {
+            if !opt.dry_run {
+                fs::create_dir_all(destination_dir).unwrap();
+            }
+        }
+    }
+
     if opt.mhl && copied_anything && !opt.dry_run {
         println!("-------------------------");
         println!("Writing mhl file...");
@@ -226,6 +239,25 @@ fn get_files_in_directory(dir: &PathBuf) -> Vec<PathBuf> {
     }
 
     files
+}
+
+// Searches the given directory recursively for empty directories and returns a vector of the empty directories.
+fn get_empty_dirs (dir: &PathBuf) -> Vec<PathBuf> {
+    let mut empty_dirs: Vec<PathBuf> = Vec::new();
+
+    for entry in fs::read_dir(dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.is_dir() {
+            let sub_dirs = get_empty_dirs(&path);
+            if sub_dirs.len() == 0 {
+                empty_dirs.push(path);
+            }
+        }
+    }
+
+    empty_dirs
 }
 
 // Copy a file from the input directory to the destination directory.
