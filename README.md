@@ -1,6 +1,6 @@
 # rccopy
 
-rccopy is a command line tool for securely copying the contents of a source directory to a new destination. It is able to calculate checksums during the copy-process and verify them afterwards. Similiar to [Silverstack](https://pomfort.com/silverstack/) or [ShotPut Pro](https://www.imagineproducts.com/product/shotput-pro), it can create a MediaHashList (.mhl) file containing all successfully copied files and their checksums. _(Note: Currently only "classic" mhl is supported, [ASC MHL](https://github.com/ascmitc/mhl-specification) will be implemented at a later date.)_
+rccopy is a command line tool for securely copying the contents of a source directory to a new destination, written in pure Rust. It is able to calculate checksums during the copy-process and verify them afterwards. Similiar to [Silverstack](https://pomfort.com/silverstack/) or [ShotPut Pro](https://www.imagineproducts.com/product/shotput-pro), it can create a MediaHashList (.mhl) file containing all successfully copied files and their checksums. _(Note: Currently only "classic" mhl is supported, [ASC MHL](https://github.com/ascmitc/mhl-specification) will be implemented at a later date.)_
 
 ## ⚠️ Warning
 
