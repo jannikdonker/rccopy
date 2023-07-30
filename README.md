@@ -1,6 +1,6 @@
 # rccopy
 
-rccopy is a command line tool for securely copying the contents of a source directory to a new destinaion. It is able to calculate checksums during the copy-process and verify them afterwards. Similiar to Silverstack or ShotPutPro, it can create a MediaHashList (.mhl) file conataining all successfully copied files and their checksums. 
+rccopy is a command line tool for securely copying the contents of a source directory to a new destinaion. It is able to calculate checksums during the copy-process and verify them afterwards. Similiar to [Silverstack](https://pomfort.com/silverstack/) or [ShotPut Pro](https://www.imagineproducts.com/product/shotput-pro), it can create a MediaHashList (.mhl) file containing all successfully copied files and their checksums. _(Note: Currently only "classic" mhl is supported, ascmhl will be implemented at a later date.)_
 
 ## ⚠️ Warning
 
@@ -11,6 +11,7 @@ This tool is in early development and has not been fully tested. It might lead t
 - Copies files from one location to another, preserving modification, access and creation dates.
 - Can copy with checksums. Supported hash methods are MD5, SHA1 and xxHash64
 - Can generate a MediaHashList (.mhl) file.
+- Is compatibel with Pomforts [SealVerify](https://pomfort.com/sealverify/) Tool, or the [mhl command line tool](https://github.com/pomfort/mhl-tool) for verifying file integrity. 
 
 ## Usage
 
@@ -24,7 +25,7 @@ Options:
 - `-d`, `--destination <DESTINATION>`  The target directory to copy to.
 - `-c`, `--checksum <CHECKSUM>`        The checksum method to use. Possible checksums: md5, sha1, xxhash64.
 - `-m`, `--mhl`                        Write a mhl file to the destination directory.
--       `--dry-run`                    Preview the files that will be copied.
+- `--dry-run`                          Preview the files that will be copied.
 - `-h`, `--help`                       Print help
 
 ## Installation
