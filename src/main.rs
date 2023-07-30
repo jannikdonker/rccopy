@@ -1,11 +1,11 @@
-use std::{path::PathBuf, time::{SystemTime, Instant, Duration}, fs, io::{Read, Write, BufWriter}};
+use std::{path::PathBuf, time::{SystemTime, Instant, Duration}, fs::{self, File}, io::{Read, Write}};
 use clap::Parser;
 use chrono::{DateTime, Utc, SecondsFormat};
 use xxhash_rust::xxh64::Xxh64;
 use md5::{Md5, Digest};
 use sha1::Sha1;
 use filetime_creation::FileTime;
-use quick_xml::Writer;
+use xml::writer::{EmitterConfig, XmlEvent};
 use whoami;
 
 #[derive(Parser, Debug)]
@@ -169,7 +169,7 @@ fn main () {
         // MHL file name is the basedir of the source directory + the current date and time + .mhl
         let mhl_file = opt.destination.join(format!("{}_{}.mhl", opt.input.file_name().unwrap().to_str().unwrap(), start_date_for_file_name));
 
-        let mhl_result = write_mhl(&mhl_file, mhl_data, start_date);
+        let mhl_result = write_mhl_v2(&mhl_file, mhl_data, start_date);
 
         if mhl_result.is_err() {
             eprintln!("Error: Could not write mhl file.");
@@ -296,9 +296,9 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
 
         // Compute and return the checksum
         let hash_string = match hasher {
-            HashMethod::Md5(h) => format!("{:x}", h.finalize()),
-            HashMethod::Sha1(h) => format!("{:x}", h.finalize()),
-            HashMethod::Xxh64(h) => format!("{:x}", h.digest()),
+            HashMethod::Md5(h) => format!("{:032x}", h.finalize()),
+            HashMethod::Sha1(h) => format!("{:040x}", h.finalize()),
+            HashMethod::Xxh64(h) => format!("{:016x}", h.digest()),
         };
 
         // Copy the metadata
@@ -391,10 +391,10 @@ fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Resul
 
     // Compute and return the checksum
     let hash_string = match hasher {
-        HashMethod::Md5(h) => format!("{:x}", h.finalize()),
-        HashMethod::Sha1(h) => format!("{:x}", h.finalize()),
-        HashMethod::Xxh64(h) => format!("{:x}", h.digest()),
-    };
+        HashMethod::Md5(h) => format!("{:032x}", h.finalize()),
+        HashMethod::Sha1(h) => format!("{:040x}", h.finalize()),
+        HashMethod::Xxh64(h) => format!("{:016x}", h.digest()),
+    };    
 
     Ok(hash_string)
 
@@ -426,72 +426,67 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-// Write a mhl file to the destination directory.
-fn write_mhl(destination_path: &PathBuf, metadata: Vec<FileMetadata>, start_date: String) -> quick_xml::Result<()> {
-    let file = fs::File::create(&destination_path)?;
-    let mut writer = Writer::new(BufWriter::new(file));
+// Writes a mhl file to the destination directory.
+fn write_mhl_v2(destination_path: &PathBuf, metadata: Vec<FileMetadata>, start_date: String) -> std::io::Result<()> {
+    let file = File::create(&destination_path)?;
+    let mut writer = EmitterConfig::new()
+        .perform_indent(true)
+        .create_writer(file);
 
-    writer.write(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")?;
-    writer.write(b"<hashlist version=\"1.1\">\n\n")?;
+    writer.write(XmlEvent::start_element("hashlist").attr("version", "1.1")).unwrap();
 
     // Reading the system information
-    let computer_name = whoami::devicename();
-    let hostname = whoami::hostname();
+    let name = whoami::realname();
     let username = whoami::username();
+    let hostname = whoami::hostname();
     let tool = format!("{} ver. {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     let finish_date = format_system_time_to_rfc3339(SystemTime::now());
 
-    writer.write(b"  <creatorinfo>\n")?;
-    writer.write(b"    <name>")?;
-    writer.write(computer_name.as_bytes())?;
-    writer.write(b"</name>\n")?;
-    writer.write(b"    <username>")?;
-    writer.write(username.as_bytes())?;
-    writer.write(b"</username>\n")?;
-    writer.write(b"    <hostname>")?;
-    writer.write(hostname.as_bytes())?;
-    writer.write(b"</hostname>\n")?;
-    writer.write(b"    <tool>")?;
-    writer.write(tool.as_bytes())?;
-    writer.write(b"</tool>\n")?;
-    writer.write(b"    <startdate>")?;
-    writer.write(start_date.as_bytes())?;
-    writer.write(b"</startdate>\n")?;
-    writer.write(b"    <finishdate>")?;
-    writer.write(finish_date.as_bytes())?;
-    writer.write(b"</finishdate>\n")?;
-    writer.write(b"  </creatorinfo>\n\n")?;
+    writer.write(XmlEvent::start_element("creatorinfo")).unwrap();
+    writer.write(XmlEvent::start_element("name")).unwrap();
+    writer.write(XmlEvent::characters(name.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::start_element("username")).unwrap();
+    writer.write(XmlEvent::characters(username.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::start_element("hostname")).unwrap();
+    writer.write(XmlEvent::characters(hostname.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::start_element("tool")).unwrap();
+    writer.write(XmlEvent::characters(tool.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::start_element("startdate")).unwrap();
+    writer.write(XmlEvent::characters(start_date.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::start_element("finishdate")).unwrap();
+    writer.write(XmlEvent::characters(finish_date.as_str())).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
+    writer.write(XmlEvent::end_element()).unwrap();
 
     for item in metadata {
-        writer.write(b"  <hash>\n")?;
-
+        writer.write(XmlEvent::start_element("hash")).unwrap();
+        writer.write(XmlEvent::start_element("file")).unwrap();
         let file_path = PathBuf::from(&item.file);
         let relative_path = file_path.strip_prefix(&destination_path).unwrap_or(&file_path);
-
-        writer.write(b"    <file>")?;
-        writer.write(relative_path.to_string_lossy().as_bytes())?;
-        writer.write(b"</file>\n")?;
-
-        writer.write(b"    <size>")?;
-        writer.write(item.size.to_string().as_bytes())?;
-        writer.write(b"</size>\n")?;
-
-        writer.write(b"    <lastmodificationdate>")?;
-        let _ = writer.write(format_system_time_to_rfc3339(item.last_modification_date).as_bytes());
-        writer.write(b"</lastmodificationdate>\n")?;
-
-        writer.write(format!("    <{}>", item.checksum_method).as_bytes())?;
-        writer.write(item.checksum.as_bytes())?;
-        writer.write(format!("</{}>\n", item.checksum_method).as_bytes())?;
-
-        writer.write(b"    <hashdate>")?;
-        let _ = writer.write(format_system_time_to_rfc3339(item.hash_date).as_bytes());
-        writer.write(b"</hashdate>\n")?;
-
-        writer.write(b"  </hash>\n\n")?;
+        writer.write(XmlEvent::characters(relative_path.to_string_lossy().as_ref())).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
+        writer.write(XmlEvent::start_element("size")).unwrap();
+        writer.write(XmlEvent::characters(item.size.to_string().as_str())).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
+        writer.write(XmlEvent::start_element("lastmodificationdate")).unwrap();
+        writer.write(XmlEvent::characters(format_system_time_to_rfc3339(item.last_modification_date).as_str())).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
+        writer.write(XmlEvent::start_element(item.checksum_method.as_str())).unwrap();
+        writer.write(XmlEvent::characters(item.checksum.as_str())).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
+        writer.write(XmlEvent::start_element("hashdate")).unwrap();
+        writer.write(XmlEvent::characters(format_system_time_to_rfc3339(item.hash_date).as_str())).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
+        writer.write(XmlEvent::end_element()).unwrap();
     }
 
-    writer.write(b"</hashlist>\n")?;
+    writer.write(XmlEvent::end_element()).unwrap();
+
 
     Ok(())
 }
