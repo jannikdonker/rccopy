@@ -54,7 +54,6 @@ const CHUNK_SIZE: usize = 1024 * 1024 * 8;
 fn main () {
     let start_date = format_system_time_to_rfc3339(SystemTime::now());
     let start_date_for_file_name: String = start_date.replace(":", "").replace("T", "_").replace("Z", "");
-    println!("Start date: {}", start_date);
 
     let opt: Opt = Opt::parse();
 
@@ -103,11 +102,48 @@ fn main () {
         // Destination file
         let destination_file = opt.destination.join(file.strip_prefix(&opt.input.parent().unwrap()).unwrap());
 
-        // Check if the file already exists in the destination directory. Verify that the file sizes match.
+        // Check if the file already exists in the destination directory. Verify that the file sizes match and the checksums match.
         if destination_file.exists() && destination_file.metadata().unwrap().len() == file.metadata().unwrap().len() {
             println!("-------------------------");
-            println!("{} / {}: File {} already exists and has identical file size. Skipping...", files.iter().position(|x| x == file).unwrap() + 1, total_files, destination_file.display());
-            continue;
+            println!("{} / {}: File {} already exists and has identical file size. Verifying checksums...", files.iter().position(|x| x == file).unwrap() + 1, total_files, destination_file.display());
+
+            if !opt.dry_run {
+                let src_checksum = process_checksum(&file.to_str().unwrap(), &opt.checksum);
+                let dest_checksum = process_checksum(&destination_file.to_str().unwrap(), &opt.checksum);
+    
+                if src_checksum.is_err() {
+                    eprintln!("Error: Could not verify checksum.");
+                    failed_files.push(file.clone());
+                    had_errors = true;
+                    continue;
+                } else if dest_checksum.is_err() {
+                    eprintln!("Error: Could not verify checksum.");
+                    failed_files.push(file.clone());
+                    had_errors = true;
+                    continue;
+                } else if src_checksum.as_ref().unwrap() == dest_checksum.as_ref().unwrap() {
+                    println!("Checksums match: {} ({})", src_checksum.as_ref().unwrap(), opt.checksum.as_ref().unwrap());
+                    let checksum_method = if opt.checksum.as_ref().unwrap() == "xxhash64" {
+                        "xxhash64be".to_string()
+                    } else {
+                        opt.checksum.as_ref().unwrap().to_string()
+                    };
+                    mhl_data.push(FileMetadata {
+                        file: destination_file.strip_prefix(&opt.destination).unwrap().to_str().unwrap().to_string(),
+                        size: file.metadata().unwrap().len(),
+                        last_modification_date: file.metadata().unwrap().modified().unwrap(),
+                        checksum: src_checksum.unwrap(),
+                        checksum_method,
+                        hash_date: SystemTime::now(),
+                    });
+                    continue;
+                } else {
+                    println!("Error: Checksums do not match. File was not copied successfully.");
+                    failed_files.push(file.clone());
+                    had_errors = true;
+                    continue;
+                }
+            }
         }
 
         println!("-------------------------");
@@ -130,8 +166,6 @@ fn main () {
             continue;
         } else {
             copied_anything = true;
-
-            print!("Verifying checksum... ({})\r", opt.checksum.as_ref().unwrap());
 
             let dest_checksum = process_checksum(&destination_file.to_str().unwrap(), &opt.checksum);
 
@@ -157,7 +191,7 @@ fn main () {
                 });
                 continue;
             } else {
-                println!("Error: Checksums do not match. File was not copied successfully.");
+                println!("Error: Checksums do not match. File was not copied successfully. ({})", opt.checksum.as_ref().unwrap());
                 failed_files.push(file.clone());
                 had_errors = true;
                 continue;
@@ -326,7 +360,7 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
             if elapsed > Duration::from_millis(100) {
                 std::io::stdout().flush().unwrap();
                 let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
-                print!("\rTransfer speed: {:30}\r", format_bytes(bytes_per_second as u64));
+                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(bytes_per_second as u64));
                 last_print_time = Instant::now();
                 total_bytes_read = 0;  // reset total_bytes_read here
             }
@@ -372,7 +406,7 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
             if elapsed > Duration::from_millis(100) {
                 std::io::stdout().flush().unwrap();
                 let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
-                print!("\rTransfer speed: {:30}\r", format_bytes(bytes_per_second as u64));
+                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(bytes_per_second as u64));
                 last_print_time = Instant::now();
                 total_bytes_read = 0;  // reset total_bytes_read here
             }
@@ -396,7 +430,11 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
 // Process the checksum of a file.
 fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Result<String, std::io::Error> {
 
+    print!("\rVerifying checksum... ({}) Speed: {:30}\r", checksum_method.as_ref().unwrap().as_str(), "---.-- MB/s");
+
     let mut buffer = vec![0; CHUNK_SIZE];
+    let mut total_bytes_read = 0;
+    let mut last_print_time = Instant::now();
 
     // Open the input file.
     let mut input_file = fs::File::open(input_file).unwrap();
@@ -414,17 +452,30 @@ fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Resul
     // Calculate the checksum of the file.
     loop {
         let bytes_read = input_file.read(&mut buffer).unwrap();
-
+    
         if bytes_read == 0 {
             break;
         }
-
+    
+        total_bytes_read += bytes_read;
+    
         // Update hash
         match &mut hasher {
             HashMethod::Md5(h) => h.update(&buffer[..bytes_read]),
             HashMethod::Sha1(h) => h.update(&buffer[..bytes_read]),
             HashMethod::Xxh64(h) => h.update(&buffer[..bytes_read]),
         };
+    
+        // Print transfer speed every 100 ms. Use the format bytes function to format the bytes.
+        let elapsed = last_print_time.elapsed();
+    
+        if elapsed > Duration::from_millis(100) {
+            std::io::stdout().flush().unwrap();
+            let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
+            print!("\rVerifying checksum... ({}) Speed: {:30}\r", checksum_method.as_ref().unwrap().as_str(), format_bytes_per_second(bytes_per_second as u64));
+            last_print_time = Instant::now();
+            total_bytes_read = 0;  // reset total_bytes_read here
+        }
     }
 
     // Compute and return the checksum
@@ -432,7 +483,10 @@ fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Resul
         HashMethod::Md5(h) => format!("{:032x}", h.finalize()),
         HashMethod::Sha1(h) => format!("{:040x}", h.finalize()),
         HashMethod::Xxh64(h) => format!("{:016x}", h.digest()),
-    };    
+    };
+
+    print!("\r\x1B[K");
+    std::io::stdout().flush().unwrap();    
 
     Ok(hash_string)
 
@@ -444,8 +498,8 @@ fn format_system_time_to_rfc3339(st: SystemTime) -> String {
     datetime.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
-// Formats Bytes to a human readable string.
-fn format_bytes(bytes: u64) -> String {
+// Formats Bytes/s to a human readable string.
+fn format_bytes_per_second(bytes: u64) -> String {
     let kb: u64 = 1024;
     let mb: u64 = kb * 1024;
     let gb: u64 = mb * 1024;
