@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::{SystemTime, Instant, Duration}, fs::{self, File}, io::{Read, Write}};
+use std::{path::PathBuf, time::{SystemTime, Instant, Duration}, fs::{self, File}, io::{Read, Write}, collections::VecDeque};
 use clap::Parser;
 use chrono::{DateTime, Utc, SecondsFormat};
 use xxhash_rust::xxh64::Xxh64;
@@ -30,6 +30,10 @@ struct Opt {
     /// Dry run. Preview the files that will be copied.
     #[clap(long, help = "Preview the files that will be copied.")]
     dry_run: bool,
+
+    /// Version
+    #[clap(short, long, help = "Prints version information.")]
+    version: bool,
 }
 
 // Struct to hold the metadata of a file for the MediaHashList.
@@ -52,10 +56,16 @@ enum HashMethod {
 const CHUNK_SIZE: usize = 1024 * 1024 * 8;
 
 fn main () {
+    let opt: Opt = Opt::parse();
+
+    // Print version information.
+    if opt.version {
+        println!("{} ver. {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
+    
     let start_date = format_system_time_to_rfc3339(SystemTime::now());
     let start_date_for_file_name: String = start_date.replace(":", "").replace("T", "_").replace("Z", "");
-
-    let opt: Opt = Opt::parse();
 
     // Check if the input and destination directorys exist. Print as Error.
     if !opt.input.exists() {
@@ -337,6 +347,9 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
         std::io::stdout().flush().unwrap();
 
         // Copy the file. With checksum.
+        let mut transfer_readings = VecDeque::new();
+        let window_size = 10;  // Use last 10 readings to calculate the speed
+
         loop {
             let bytes_read = input_file.read(&mut buffer).unwrap();
 
@@ -353,18 +366,28 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
             };
 
             total_bytes_read += bytes_read;
-        
+            
             // Print transfer speed every 100 ms. Use the format bytes function to format the bytes.
             let elapsed = last_print_time.elapsed();
 
             if elapsed > Duration::from_millis(100) {
                 std::io::stdout().flush().unwrap();
                 let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
-                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(bytes_per_second as u64));
+
+                // Use a moving window to smooth the transfer speed
+                if transfer_readings.len() >= window_size {
+                    transfer_readings.pop_front();
+                }
+                transfer_readings.push_back(bytes_per_second);
+
+                let avg_bytes_per_second: f64 = transfer_readings.iter().sum::<f64>() / transfer_readings.len() as f64;
+
+                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(avg_bytes_per_second as u64));
                 last_print_time = Instant::now();
                 total_bytes_read = 0;  // reset total_bytes_read here
             }
         }
+
 
         // Compute and return the checksum
         let hash_string = match hasher {
@@ -392,6 +415,9 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
         std::io::stdout().flush().unwrap();
 
         // Copy the file.
+        let mut transfer_readings = VecDeque::new();
+        let window_size = 10;  // Use last 10 readings to calculate the speed
+
         loop {
             let bytes_read = input_file.read(&mut buffer).unwrap();
             if bytes_read == 0 {
@@ -399,18 +425,28 @@ fn copy_file (input_path: &PathBuf, destination_path: &PathBuf, checksum_method:
             }
             destination_file.write_all(&buffer[..bytes_read]).unwrap();
             total_bytes_read += bytes_read;
-        
+            
             // Print transfer speed every 100 ms. Use the format bytes function to format the bytes.
             let elapsed = last_print_time.elapsed();
 
             if elapsed > Duration::from_millis(100) {
                 std::io::stdout().flush().unwrap();
                 let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
-                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(bytes_per_second as u64));
+
+                // Use a moving window to smooth the transfer speed
+                if transfer_readings.len() >= window_size {
+                    transfer_readings.pop_front();
+                }
+                transfer_readings.push_back(bytes_per_second);
+
+                let avg_bytes_per_second: f64 = transfer_readings.iter().sum::<f64>() / transfer_readings.len() as f64;
+
+                print!("\rTransfer speed: {:30}\r", format_bytes_per_second(avg_bytes_per_second as u64));
                 last_print_time = Instant::now();
                 total_bytes_read = 0;  // reset total_bytes_read here
             }
         }
+
 
         // Copy the metadata
         let metadata = std::fs::metadata(input_path)?;
@@ -450,6 +486,9 @@ fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Resul
     };
 
     // Calculate the checksum of the file.
+    let mut readings = VecDeque::new();
+    let window_size = 10;  // Use last 10 readings to calculate the speed
+
     loop {
         let bytes_read = input_file.read(&mut buffer).unwrap();
     
@@ -472,7 +511,16 @@ fn process_checksum(input_file: &str, checksum_method: &Option<String>) -> Resul
         if elapsed > Duration::from_millis(100) {
             std::io::stdout().flush().unwrap();
             let bytes_per_second = total_bytes_read as f64 / elapsed.as_secs_f64();
-            print!("\rVerifying checksum... ({}) Speed: {:30}\r", checksum_method.as_ref().unwrap().as_str(), format_bytes_per_second(bytes_per_second as u64));
+
+            // Use a moving window to smooth the transfer speed
+            if readings.len() >= window_size {
+                readings.pop_front();
+            }
+            readings.push_back(bytes_per_second);
+
+            let avg_bytes_per_second: f64 = readings.iter().sum::<f64>() / readings.len() as f64;
+
+            print!("\rVerifying checksum... ({}) Speed: {:30}\r", checksum_method.as_ref().unwrap().as_str(), format_bytes_per_second(avg_bytes_per_second as u64));
             last_print_time = Instant::now();
             total_bytes_read = 0;  // reset total_bytes_read here
         }
