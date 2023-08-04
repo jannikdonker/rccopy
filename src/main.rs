@@ -30,10 +30,6 @@ struct Opt {
     /// Dry run. Preview the files that will be copied.
     #[clap(long, help = "Preview the files that will be copied.")]
     dry_run: bool,
-
-    /// Version
-    #[clap(short, long, help = "Prints version information.")]
-    version: bool,
 }
 
 // Struct to hold the metadata of a file for the MediaHashList.
@@ -56,14 +52,9 @@ enum HashMethod {
 const CHUNK_SIZE: usize = 1024 * 1024 * 8;
 
 fn main () {
+
     let opt: Opt = Opt::parse();
 
-    // Print version information.
-    if opt.version {
-        println!("{} ver. {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-        std::process::exit(0);
-    }
-    
     let start_date = format_system_time_to_rfc3339(SystemTime::now());
     let start_date_for_file_name: String = start_date.replace(":", "").replace("T", "_").replace("Z", "");
 
