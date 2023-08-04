@@ -26,7 +26,8 @@ Options:
 - `-c`, `--checksum <CHECKSUM>`        The checksum method to use. Possible checksums: md5, sha1, xxhash64.
 - `-m`, `--mhl`                        Write a mhl file to the destination directory.
 - `--dry-run`                          Preview the files that will be copied.
-- `-h`, `--help`                       Print help
+- `-h`, `--help`                       Print help.
+- `-v`, `--version`                    Print version information.
 
 ## Installation
 
