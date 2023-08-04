@@ -27,7 +27,6 @@ Options:
 - `-m`, `--mhl`                        Write a mhl file to the destination directory.
 - `--dry-run`                          Preview the files that will be copied.
 - `-h`, `--help`                       Print help.
-- `-v`, `--version`                    Print version information.
 
 ## Installation
 
