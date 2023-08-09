@@ -30,4 +30,4 @@ Options:
 
 ## Installation
 
-A universal Mac binary is available for download from the "Releases" section. Currently, only macOS is compiled and tested but feel free to compile and test for other platforms.
+A universal Mac binary is available for download from [releases](https://github.com/jannikdonker/rccopy/releases). Currently, only macOS is compiled and tested but feel free to compile and test for other platforms.
